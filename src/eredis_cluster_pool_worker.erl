@@ -61,7 +61,7 @@ handle_info(reconnect, #state{host = Hostname,
                               port = Port,
                               database = DataBase,
                               password = Password} = State) ->
-    Options = case erlang:put(options) of
+    Options = case erlang:get(options) of
         undefined -> [];
         Options0 -> Options0
     end,

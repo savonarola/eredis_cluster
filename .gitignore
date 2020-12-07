@@ -12,3 +12,5 @@ _build/
 priv/
 doc/
 mix.lock
+/.idea/
+.DS_Store

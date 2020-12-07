@@ -81,7 +81,9 @@ get_pool_by_slot(Name, Slot) ->
 
 -spec reload_slots_map(State::#state{}) -> NewState::#state{}.
 reload_slots_map(State = #state{pool_name = PoolName}) ->
-    NewState = case get_cluster_slots(State#state.init_nodes, State) of
+    NewState = case get_cluster_slots(State#state.init_nodes, State, 0) of
+        {error, Reason} ->
+            {error, Reason};
         [] -> State#state{version = State#state.version + 1};
         ClusterSlots ->
             [close_connection(SlotsMap)
@@ -98,9 +100,15 @@ reload_slots_map(State = #state{pool_name = PoolName}) ->
     true = ets:insert(?MODULE, [{PoolName, NewState}]),
     NewState.
 
-get_cluster_slots([], _State) ->
-    [];
-get_cluster_slots([Node|T], State) ->
+get_cluster_slots([], State, FailAcc) ->
+    case erlang:length(State#state.init_nodes) =:= FailAcc of
+        true ->
+            {error, <<"ERR all nodes are down">>};
+        false ->
+            []
+    end;
+
+get_cluster_slots([Node|T], State, FailAcc) ->
     case safe_eredis_start_link(Node, State) of
         {ok,Connection} ->
           case eredis:q(Connection, ["CLUSTER", "SLOTS"]) of
@@ -113,10 +121,10 @@ get_cluster_slots([Node|T], State) ->
                 ClusterInfo;
             _ ->
                 eredis:stop(Connection),
-                get_cluster_slots(T, State)
+                get_cluster_slots(T, State, FailAcc+1)
         end;
         _ ->
-            get_cluster_slots(T, State)
+            get_cluster_slots(T, State, FailAcc+1)
   end.
 
 -spec get_cluster_slots_from_single_node(#node{}) ->
@@ -166,7 +174,7 @@ connect_node(Node = #node{address  = Host, port = Port}, #state{database = DataB
                                                                 password = Password,
                                                                 size     = Size,
                                                                 max_overflow = MaxOverflow}) ->
-    Options = case erlang:put(options) of
+    Options = case erlang:get(options) of
         undefined -> [];
         Options0 -> Options0
     end,
@@ -179,7 +187,7 @@ connect_node(Node = #node{address  = Host, port = Port}, #state{database = DataB
 
 safe_eredis_start_link(#node{address = Host, port = Port},
                        #state{database = DataBase, password = Password}) ->
-    Options = case erlang:put(options) of
+    Options = case erlang:get(options) of
         undefined -> [];
         Options0 -> Options0
     end,
@@ -218,7 +226,12 @@ connect_(PoolName, Opts) ->
 
 init([PoolName, Opts]) ->
     process_flag(trap_exit, true),
-    {ok, connect_(PoolName, Opts)}.
+    case connect_(PoolName, Opts) of
+        {error, Reason} ->
+            {stop, Reason};
+        State ->
+            {ok, State}
+    end.
 
 handle_call({reload_slots_map,Version}, _From, #state{version=Version} = State) ->
     {reply, ok, reload_slots_map(State)};
