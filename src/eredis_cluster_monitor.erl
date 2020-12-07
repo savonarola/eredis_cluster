@@ -82,8 +82,8 @@ get_pool_by_slot(Name, Slot) ->
 -spec reload_slots_map(State::#state{}) -> NewState::#state{}.
 reload_slots_map(State = #state{pool_name = PoolName}) ->
     NewState = case get_cluster_slots(State#state.init_nodes, State, 0) of
-        {error, Reason} ->
-            {error, Reason};
+        {error, _Reason} ->
+            State#state{init_nodes = []};
         [] -> State#state{version = State#state.version + 1};
         ClusterSlots ->
             [close_connection(SlotsMap)
@@ -227,8 +227,8 @@ connect_(PoolName, Opts) ->
 init([PoolName, Opts]) ->
     process_flag(trap_exit, true),
     case connect_(PoolName, Opts) of
-        {error, Reason} ->
-            {stop, Reason};
+        #state{init_nodes = []} ->
+            {stop, <<"ERR unable to connect to any nodes">>};
         State ->
             {ok, State}
     end.
