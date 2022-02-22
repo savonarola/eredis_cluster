@@ -3,7 +3,7 @@
 
 %% Supervisor.
 -export([start_link/0]).
--export([start_child/2, stop_child/1]).
+-export([start_child/2, has_child/1, stop_child/1]).
 -export([init/1]).
 
 -spec start_link() -> {ok, pid()}.
@@ -30,6 +30,14 @@ stop_child(Name) ->
     case supervisor:terminate_child(?MODULE, name(Name)) of
         ok -> supervisor:delete_child(?MODULE, name(Name));
         Error -> Error
+    end.
+
+has_child(Name) ->
+    case supervisor:get_childspec(?MODULE, name(Name)) of
+        {ok, _} ->
+            true;
+        {error, not_found} ->
+            false
     end.
 
 name(Name) ->

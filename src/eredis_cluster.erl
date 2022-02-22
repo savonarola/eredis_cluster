@@ -8,7 +8,7 @@
 % API.
 -export([start/0, stop/0]). % Application Management.
 
--export([start_pool/2, stop_pool/1]).
+-export([start_pool/2, pool_exists/1, stop_pool/1]).
 
 % Generic redis call
 -export([q/2, qp/2, qw/2, qk/3, qa/2, transaction/2]).
@@ -24,6 +24,9 @@
 
 start_pool(PoolName, Opts) ->
     eredis_cluster_sup:start_child(PoolName, [PoolName, Opts]).
+
+pool_exists(PoolName) ->
+    eredis_cluster_sup:has_child(PoolName).
 
 stop_pool(PoolName) ->
     eredis_cluster_sup:stop_child(PoolName).
