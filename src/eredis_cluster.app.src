@@ -1,3 +1,4 @@
+%% -*- mode: erlang -*-
 {application, eredis_cluster, [
     {description, "Redis Cluster pool"},
     {vsn, "git"},

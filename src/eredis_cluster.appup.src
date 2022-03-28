@@ -1,6 +1,5 @@
-%% -*-: erlang -*-
-
-{"0.7.0",
+%% -*- mode: erlang -*-
+{"0.7.1",
   [
     {"0.5.11", [
       {load_module, eredis_cluster_sup, brutal_purge, soft_purge, []},
