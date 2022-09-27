@@ -16,7 +16,7 @@
 
 -record(state, {conn, host, port, database, password}).
 
--define(RECONNECT_TIME, 100).
+-define(RECONNECT_TIME, 10000).
 
 is_connected(Pid) ->
     gen_server:call(Pid, is_connected).
@@ -32,8 +32,8 @@ init(Args) ->
     Options = proplists:get_value(options, Args, []),
     erlang:put(options, Options),
     process_flag(trap_exit, true),
-    Conn = start_connection(Hostname, Port, DataBase, Password, Options),
-    {ok, #state{conn = Conn,
+    erlang:send(self(), reconnect),
+    {ok, #state{conn = undefined,
                 host = Hostname,
                 port = Port,
                 database = DataBase,
@@ -46,9 +46,9 @@ handle_call({'query', _}, _From, #state{conn = undefined} = State) ->
     {reply, {error, no_connection}, State};
 handle_call({'query', [[X|_]|_] = Commands}, _From, #state{conn = Conn} = State)
     when is_list(X); is_binary(X) ->
-    {reply, eredis:qp(Conn, Commands), State};
+    {reply, safe_query(qp, Conn, Commands), State};
 handle_call({'query', Command}, _From, #state{conn = Conn} = State) ->
-    {reply, eredis:q(Conn, Command), State};
+    {reply, safe_query(q, Conn, Command), State};
 handle_call(is_connected, _From, #state{conn = Conn}= State) ->
     {reply, Conn =/= undefined andalso is_process_alive(Conn), State};
 handle_call(_Request, _From, State) ->
@@ -68,7 +68,8 @@ handle_info(reconnect, #state{host = Hostname,
     Conn = start_connection(Hostname, Port, DataBase, Password, Options),
     {noreply, State#state{conn = Conn}};
 
-handle_info({'EXIT', Pid, _Reason}, #state{conn = Pid} = State) ->
+handle_info({'EXIT', Pid, _Reason}, #state{conn = Pid0} = State)
+        when Pid0 =:= Pid; Pid0 =:= undefined ->
     erlang:send_after(?RECONNECT_TIME, self(), reconnect),
     {noreply, State#state{conn = undefined}};
 
@@ -84,7 +85,15 @@ terminate(_Reason, #state{conn=Conn}) ->
 code_change(_, State, _Extra) ->
     {ok, State}.
 
+safe_query(Func, Conn, Commands) ->
+    try eredis:Func(Conn, Commands)
+    catch
+        exit:{timeout, _} ->
+            {error, timeout}
+    end.
+
 start_connection(Hostname, Port, DataBase, Password, Options) ->
+    %% NOTE: `eredis:start_link/7` may raise exceptions if connect to redis failed.
     case eredis:start_link(Hostname, Port, DataBase, Password, no_reconnect, 5000, Options) of
         {ok,Connection} ->
             Connection;
