@@ -16,7 +16,7 @@
 
 -record(state, {conn, host, port, database, password}).
 
--define(RECONNECT_TIME, 10000).
+-define(RECONNECT_TIME, 2000).
 
 is_connected(Pid) ->
     gen_server:call(Pid, is_connected).
