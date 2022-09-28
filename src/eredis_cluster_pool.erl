@@ -16,7 +16,7 @@
 create(Host, Port, DataBase, Password, Size, MaxOverflow) ->
     create(Host, Port, DataBase, Password, Size, MaxOverflow, []).
 create(Host, Port, DataBase, Password, Size, MaxOverflow, Options) ->
-    PoolName = get_name(Host, Port),
+    PoolName = get_name(Host, Port, Options),
     case whereis(PoolName) of
         undefined ->
             WorkerArgs = [{host, Host},
@@ -63,5 +63,15 @@ start_link() ->
 init([]) ->
     {ok, {{one_for_one, 1, 5}, []}}.
 
-get_name(Host, Port) ->
-    list_to_atom(Host ++ "#" ++ integer_to_list(Port)).
+get_name(Host, Port, Options) ->
+    Prefix = proplists:get_value(worker_name_prefix, Options, rand_int()),
+    list_to_atom(str(Prefix) ++ "_" ++ Host ++ "#" ++ str(Port)).
+
+str(S) when is_integer(S) -> integer_to_list(S);
+str(S) when is_binary(S) -> binary_to_list(S);
+str(S) when is_atom(S) -> atom_to_list(S);
+str(S) when is_list(S) -> S.
+
+rand_int() ->
+    <<R:32>> = crypto:strong_rand_bytes(4),
+    R.

@@ -15,6 +15,7 @@
 -export([handle_info/2]).
 -export([terminate/2]).
 -export([code_change/3]).
+-export([format_status/2]).
 
 %% Type definition.
 -include("eredis_cluster.hrl").
@@ -251,9 +252,14 @@ terminate(_Reason, #state{slots_maps = Slots}) ->
     [eredis_cluster_pool:stop(SlotsMap#slots_map.node#node.pool) ||
         SlotsMap <- SlotsMapList, SlotsMap#slots_map.node =/= undefined],
     ok.
-% Down
+
 code_change(_, State, _Extra) ->
     {ok, State}.
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    [{data, [{"State", State#state{password = "******"}}]}];
+format_status(_Opt, [_PDict, State]) ->
+    [{data, [{"State", State}]}].
 
 name(Name) ->
     list_to_atom("monitor_" ++ atom_to_list(Name)).
