@@ -57,7 +57,8 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(reconnect, #state{host = Hostname,
+handle_info(reconnect, #state{conn = undefined,
+                              host = Hostname,
                               port = Port,
                               database = DataBase,
                               password = Password} = State) ->
@@ -67,6 +68,9 @@ handle_info(reconnect, #state{host = Hostname,
     end,
     Conn = start_connection(Hostname, Port, DataBase, Password, Options),
     {noreply, State#state{conn = Conn}};
+
+handle_info(reconnect, State) ->
+    {noreply, State};
 
 handle_info({'EXIT', Pid, _Reason}, #state{conn = Pid0} = State)
         when Pid0 =:= Pid; Pid0 =:= undefined ->
@@ -93,11 +97,11 @@ safe_query(Func, Conn, Commands) ->
     end.
 
 start_connection(Hostname, Port, DataBase, Password, Options) ->
-    %% NOTE: `eredis:start_link/7` may raise exceptions if connect to redis failed.
+    %% NOTE: `eredis:start_link/7` may raise exceptions if connect to redis failed,
+    %%  so we will receive an 'EXIT' message.
     case eredis:start_link(Hostname, Port, DataBase, Password, no_reconnect, 5000, Options) of
         {ok,Connection} ->
             Connection;
         _ ->
-            erlang:send_after(?RECONNECT_TIME, self(), reconnect),
             undefined
     end.
