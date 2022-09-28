@@ -20,9 +20,9 @@ init([]) ->
             ],
     {ok, {{one_for_one, 1, 5}, Procs}}.
 
-start_child(Name, Params) ->
+start_child(Name, Opts) ->
     ChildSpec = {name(Name),
-                 {eredis_cluster_monitor, start_link, Params},
+                 {eredis_cluster_monitor, start_link, Opts},
                  permanent, 5000, worker, [eredis_cluster_monitor]},
     supervisor:start_child(?MODULE, ChildSpec).
 
