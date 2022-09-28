@@ -15,21 +15,24 @@
       {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []}
     ]},
-    {<<"0.6.[3-6]">>, [
+    {<<"0\\.6\\.[3-6]">>, [
       {load_module, eredis_cluster_sup, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool, brutal_purge, soft_purge, []},
-      {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []}
+      {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []},
+      {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []}
     ]},
     {"0.6.7", [
       {load_module, eredis_cluster_sup, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool, brutal_purge, soft_purge, []},
+      {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster, brutal_purge, soft_purge, []}
     ]},
-    {<<"0.7.[0-3]">>, [
+    {<<"0\\.7\\.[0-3]">>, [
       {load_module, eredis_cluster_pool, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_sup, brutal_purge, soft_purge, []},
+      {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []}
     ]},
     {<<".*">>, [
@@ -50,21 +53,24 @@
       {load_module, eredis_cluster_pool, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []}
     ]},
-    {<<"0.6.[3-6]">>, [
+    {<<"0\\.6\\.[3-6]">>, [
       {load_module, eredis_cluster_sup, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool, brutal_purge, soft_purge, []},
+      {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []}
     ]},
     {"0.6.7", [
       {load_module, eredis_cluster_sup, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool, brutal_purge, soft_purge, []},
+      {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster, brutal_purge, soft_purge, []}
     ]},
-    {<<"0.7.[0-3]">>, [
+    {<<"0\\.7\\.[0-3]">>, [
       {load_module, eredis_cluster_pool, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_sup, brutal_purge, soft_purge, []},
+      {load_module, eredis_cluster_monitor, brutal_purge, soft_purge, []},
       {load_module, eredis_cluster_pool_worker, brutal_purge, soft_purge, []}
     ]},
     {<<".*">>, [
