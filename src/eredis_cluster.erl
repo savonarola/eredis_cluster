@@ -11,15 +11,15 @@
 -export([start_pool/2, pool_exists/1, stop_pool/1]).
 
 % Generic redis call
--export([q/2, qp/2, qw/2, qk/3, qa/2, transaction/2]).
+-export([q/2, qp/2, qw/2, qk/3, qa/2, transaction/2, transaction/3]).
 
 % Specific redis command implementation
 -export([flushdb/1]).
 
  % Helper functions
--export([update_key/2]).
--export([update_hash_field/3]).
--export([optimistic_locking_transaction/3]).
+-export([update_key/3]).
+-export([update_hash_field/4]).
+-export([optimistic_locking_transaction/4]).
 -export([eval/5]).
 
 start_pool(PoolName, Opts) ->
@@ -57,7 +57,7 @@ stop() ->
 %% =============================================================================
 transaction(Pool, Commands) when is_atom(Pool) ->
     Result = q(Pool, [["multi"]| Commands] ++ [["exec"]]),
-    lists:last(Result);
+    lists:last(Result).
 
 %% =============================================================================
 %% @doc Execute a function on a pool worker. This function should be use when
@@ -66,18 +66,18 @@ transaction(Pool, Commands) when is_atom(Pool) ->
 %% containing.
 %% @end
 %% =============================================================================
-transaction(Transaction, PoolKey) ->
+transaction(Pool, Transaction, PoolKey) when is_atom(Pool) ->
     Slot = get_key_slot(PoolKey),
-    transaction(Transaction, Slot, undefined, 0).
+    transaction(Pool, Transaction, Slot, undefined, 0).
 
-transaction(Transaction, Slot, undefined, _) ->
-    query(Transaction, Slot, 0);
-transaction(Transaction, Slot, ExpectedValue, Counter) ->
-    case query(Transaction, Slot, 0) of
+transaction(Pool, Transaction, Slot, undefined, _) ->
+    query(Pool, Transaction, Slot, 0);
+transaction(Pool, Transaction, Slot, ExpectedValue, Counter) ->
+    case query(Pool, Transaction, Slot, 0) of
         ExpectedValue ->
-            transaction(Transaction, Slot, ExpectedValue, Counter - 1);
+            transaction(Pool, Transaction, Slot, ExpectedValue, Counter - 1);
         {ExpectedValue, _} ->
-            transaction(Transaction, Slot, ExpectedValue, Counter - 1);
+            transaction(Pool, Transaction, Slot, ExpectedValue, Counter - 1);
         Payload ->
             Payload
     end.
@@ -158,15 +158,15 @@ throttle_retries(_) -> timer:sleep(?REDIS_RETRY_DELAY).
 %% argument. The operation is done atomically
 %% @end
 %% =============================================================================
--spec update_key(Key::anystring(), UpdateFunction::fun((any()) -> any())) ->
+-spec update_key(Pool::atom(), Key::anystring(), UpdateFunction::fun((any()) -> any())) ->
     redis_transaction_result().
-update_key(Key, UpdateFunction) ->
+update_key(Pool, Key, UpdateFunction) ->
     UpdateFunction2 = fun(GetResult) ->
         {ok, Var} = GetResult,
         UpdatedVar = UpdateFunction(Var),
         {[["SET", Key, UpdatedVar]], UpdatedVar}
     end,
-    case optimistic_locking_transaction(Key, ["GET", Key], UpdateFunction2) of
+    case optimistic_locking_transaction(Pool, Key, ["GET", Key], UpdateFunction2) of
         {ok, {_, NewValue}} ->
             {ok, NewValue};
         Error ->
@@ -178,15 +178,15 @@ update_key(Key, UpdateFunction) ->
 %% passed in the argument. The operation is done atomically
 %% @end
 %% =============================================================================
--spec update_hash_field(Key::anystring(), Field::anystring(),
+-spec update_hash_field(Pool::atom(), Key::anystring(), Field::anystring(),
     UpdateFunction::fun((any()) -> any())) -> redis_transaction_result().
-update_hash_field(Key, Field, UpdateFunction) ->
+update_hash_field(Pool, Key, Field, UpdateFunction) ->
     UpdateFunction2 = fun(GetResult) ->
         {ok, Var} = GetResult,
         UpdatedVar = UpdateFunction(Var),
         {[["HSET", Key, Field, UpdatedVar]], UpdatedVar}
     end,
-    case optimistic_locking_transaction(Key, ["HGET", Key, Field], UpdateFunction2) of
+    case optimistic_locking_transaction(Pool, Key, ["HGET", Key, Field], UpdateFunction2) of
         {ok, {[FieldPresent], NewValue}} ->
             {ok, {FieldPresent, NewValue}};
         Error ->
@@ -198,7 +198,7 @@ update_hash_field(Key, Field, UpdateFunction) ->
 %% http://redis.io/topics/transactions
 %% @end
 %% =============================================================================
-optimistic_locking_transaction(WatchedKey, GetCommand, UpdateFunction) ->
+optimistic_locking_transaction(Pool, WatchedKey, GetCommand, UpdateFunction) ->
     Slot = get_key_slot(WatchedKey),
     Transaction = fun(Worker) ->
         %% Watch given key
@@ -215,7 +215,7 @@ optimistic_locking_transaction(WatchedKey, GetCommand, UpdateFunction) ->
         RedisResult = qw(Worker, [["MULTI"]] ++ UpdateCommand ++ [["EXEC"]]),
         {lists:last(RedisResult), Result}
     end,
-    case transaction(Transaction, Slot, {ok, undefined}, ?OL_TRANSACTION_TTL) of
+    case transaction(Pool, Transaction, Slot, {ok, undefined}, ?OL_TRANSACTION_TTL) of
         {{ok, undefined}, _} ->
             {error, resource_busy};
         {{ok, TransactionResult}, UpdateResult} ->

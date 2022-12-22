@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+  redis-node-0: &redis-node
+    image: docker.io/bitnami/redis-cluster:${REDIS_TAG}
+    ports:
+      - "30001:${REDIS_PORT_NUMBER}"
+    environment:
+      - 'REDIS_PASSWORD=${REDIS_PASSWORD}'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-1:
+    <<: *redis-node
+    ports:
+      - "30002:${REDIS_PORT_NUMBER}"
+
+  redis-node-2:
+    <<: *redis-node
+    ports:
+      - "30003:${REDIS_PORT_NUMBER}"
+
+  redis-node-3:
+    <<: *redis-node
+    ports:
+      - "30004:${REDIS_PORT_NUMBER}"
+
+  redis-node-4:
+    <<: *redis-node
+    ports:
+      - "30005:${REDIS_PORT_NUMBER}"
+
+  redis-node-5:
+    image: docker.io/bitnami/redis-cluster:${REDIS_TAG}
+    depends_on:
+      - redis-node-0
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+    environment:
+      - 'REDIS_PASSWORD=${REDIS_PASSWORD}'
+      - 'REDISCLI_AUTH=${REDIS_PASSWORD}'
+      - 'REDIS_CLUSTER_REPLICAS=1'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+      - 'REDIS_CLUSTER_CREATOR=yes'
+    ports:
+      - "30006:${REDIS_PORT_NUMBER}"
