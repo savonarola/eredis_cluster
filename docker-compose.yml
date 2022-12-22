@@ -45,3 +45,16 @@ services:
       - 'REDIS_CLUSTER_CREATOR=yes'
     ports:
       - "30006:${REDIS_PORT_NUMBER}"
+    healthcheck:
+      test: |
+        # Convert `cluster info` output into shell variable assignments 
+        eval "$(
+          redis-cli -a "${REDIS_PASSWORD}" --no-auth-warning cluster info | \
+            grep "^cluster" | \
+            sed -r 's/(\w+):(\w+).*/\1=\2/'
+        )"
+        [ "$$cluster_state" = "ok" ]      || { echo "cluster state = $$cluster_state"; exit 1; }
+        [ "$$cluster_size" -gt 1 ]        || { echo "cluster size = $$cluster_size"; exit 2; }
+        [ "$$cluster_known_nodes" -eq 6 ] || { echo "known nodes = $$cluster_known_nodes"; exit 3; }
+      interval: 5s
+      retries: 3
