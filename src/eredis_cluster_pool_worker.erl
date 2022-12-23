@@ -13,6 +13,7 @@
 -export([handle_info/2]).
 -export([terminate/2]).
 -export([code_change/3]).
+-export([format_status/1]).
 -export([format_status/2]).
 
 -record(state, {conn, host, port, database, password}).
@@ -90,11 +91,20 @@ terminate(_Reason, #state{conn=Conn}) ->
 code_change(_, State, _Extra) ->
     {ok, State}.
 
-format_status(_Opt, [_PDict, #state{} = State]) ->
-    [{data, [{"State", State#state{password = "******"}}]}];
-format_status(_Opt, [_PDict, State]) ->
-    [{data, [{"State", State}]}].
+format_status(Status = #{state := State}) ->
+    Status#{state => censor_state(State)}.
 
+%% TODO
+%% This is deprecated since OTP-25 in favor of `format_status/1`. Remove once
+%% OTP-25 becomes minimum supported OTP version.
+format_status(_Opt, [_PDict, State]) ->
+    [{data, [{"State", censor_state(State)}]}].
+
+censor_state(#state{} = State) ->
+    State#state{password = "******"};
+censor_state(State) ->
+    State.
+    
 safe_query(Func, Conn, Commands) ->
     try eredis:Func(Conn, Commands)
     catch

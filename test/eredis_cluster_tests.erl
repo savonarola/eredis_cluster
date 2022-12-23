@@ -2,9 +2,13 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+%% eredis_cluster wrappers
 -export([transaction/2]).
 -export([update_key/2]).
 -export([update_hash_field/3]).
+
+%% logger handler
+-export([log/2]).
 
 -define(POOL, ?MODULE).
 -define(POOL_OPTS, [
@@ -20,11 +24,11 @@
 
 setup() ->
     {ok, Apps} = application:ensure_all_started(eredis_cluster),
-    {ok, _Pid} = eredis_cluster:start_pool(?POOL, ?POOL_OPTS),
-    Apps.
+    {ok, MonPid} = eredis_cluster:start_pool(?POOL, ?POOL_OPTS),
+    {Apps, MonPid}.
 
-cleanup(Apps) ->
-    ok = eredis_cluster:stop_pool(?POOL),
+cleanup({Apps, _MonPid}) ->
+    _ = catch eredis_cluster:stop_pool(?POOL),
     ok = lists:foreach(fun application:stop/1, lists:reverse(Apps)).
 
 basic_test_() ->
@@ -166,6 +170,60 @@ basic_test_() ->
     }
 }.
 
+censor_test_() ->
+    {setup, fun setup/0, fun cleanup/1, fun({_Apps, MonPid}) -> [
+        {"no password in worker state", fun () ->
+            GetStatus = fun(Worker) ->
+                {status,
+                    Worker,
+                    _,
+                    [_, _, _, _, Misc]
+                } = sys:get_status(Worker),
+                ?assertMatch(
+                    {state, _Conn, _Host, _Port, _DB, "******"},
+                    extract_state(Misc)
+                )
+            end,
+            eredis_cluster:transaction(?POOL, GetStatus, "bla")
+        end},
+        {"no password in logger report", fun () ->
+            try
+                ok = logger:add_handler(?MODULE, ?MODULE, #{relay_to => self()}),
+                ok = proc_lib:stop(MonPid, Reason = {hush, ?MODULE}, 1000),
+                receive
+                    {log, Message} ->
+                        ?assertMatch(
+                            {report, #{
+                                label := {gen_server, terminate},
+                                reason := Reason,
+                                state := _
+                            }},
+                            Message
+                        ),
+                        ?assertMatch(
+                            [state, _Nodes, _Slots, _Maps, _Vsn, ?MODULE, _DB, "******" | _],
+                            tuple_to_list(extract_report_state(Message))
+                        )
+                after 1000 ->
+                    error(timeout)
+                end
+            after
+                logger:remove_handler(?MODULE)
+            end
+        end}
+    ] end}.
+
+extract_report_state({report, #{state := State}}) when element(1, State) == state ->
+    % OTP-25 and newer: state is right here
+    State;
+extract_report_state({report, #{state := Misc}}) when is_list(Misc) ->
+    % OTP-24 and earlier: state is wrapped in a legacy system report structure
+    extract_state(Misc).
+
+extract_state(Misc = [_ | _]) ->
+    [State] = [State || {data, [{"State", State} | _Rest]} <- Misc],
+    State.
+
 transaction(Transaction, PoolKey) ->
     eredis_cluster:transaction(?POOL, Transaction, PoolKey).
 
@@ -174,3 +232,8 @@ update_key(Key, UpdateFun) ->
 
 update_hash_field(Key, Field, UpdateFun) ->
     eredis_cluster:update_hash_field(?POOL, Key, Field, UpdateFun).
+
+log(#{msg := Msg}, #{relay_to := Pid}) ->
+    Pid ! {log, Msg};
+log(_, _) ->
+    ok.
