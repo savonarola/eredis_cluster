@@ -179,8 +179,10 @@ censor_test_() ->
                     _,
                     [_, _, _, _, Misc]
                 } = sys:get_status(Worker),
-                [State] = [State || {data, [{"State", State} | _Rest]} <- Misc],
-                ?assertMatch({state, _Conn, _Host, _Port, _DB, "******"}, State)
+                ?assertMatch(
+                    {state, _Conn, _Host, _Port, _DB, "******"},
+                    extract_state(Misc)
+                )
             end,
             eredis_cluster:transaction(?POOL, GetStatus, "bla")
         end},
@@ -198,10 +200,9 @@ censor_test_() ->
                             }},
                             Message
                         ),
-                        {report, #{state := State}} = Message,
                         ?assertMatch(
                             [state, _Nodes, _Slots, _Maps, _Vsn, ?MODULE, _DB, "******" | _],
-                            tuple_to_list(State)
+                            tuple_to_list(extract_report_state(Message))
                         )
                 after 1000 ->
                     error(timeout)
@@ -211,6 +212,17 @@ censor_test_() ->
             end
         end}
     ] end}.
+
+extract_report_state({report, #{state := State}}) when element(1, State) == state ->
+    % OTP-25 and newer: state is right here
+    State;
+extract_report_state({report, #{state := Misc}}) when is_list(Misc) ->
+    % OTP-24 and earlier: state is wrapped in a legacy system report structure
+    extract_state(Misc).
+
+extract_state(Misc = [_ | _]) ->
+    [State] = [State || {data, [{"State", State} | _Rest]} <- Misc],
+    State.
 
 transaction(Transaction, PoolKey) ->
     eredis_cluster:transaction(?POOL, Transaction, PoolKey).
