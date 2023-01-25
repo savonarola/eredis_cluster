@@ -7,6 +7,7 @@
 -export([get_state/1, get_state_version/1]).
 -export([get_pool_by_slot/2]).
 -export([get_all_pools/1]).
+-export([get_slot_samples/1]).
 
 %% gen_server.
 -export([init/1]).
@@ -49,7 +50,7 @@ refresh_mapping(Name, Version) ->
 %% =============================================================================
 get_state(Name) ->
     case ets:lookup(?MODULE, Name) of
-        undefined -> #state{};
+        [] -> #state{};
         [{Name, State}] -> State
     end.
 
@@ -81,11 +82,19 @@ get_pool_by_slot(Name, Slot) ->
     State = get_state(Name),
     get_pool_by_slot(Slot, State).
 
+get_slot_samples(Name) ->
+    #state{slots_maps = SlotsMaps0} = get_state(Name),
+    SlotsMaps1 = case SlotsMaps0 of
+                     undefined -> [];
+                     T when is_tuple(T) -> tuple_to_list(T)
+                 end,
+    lists:map(fun(#slots_map{start_slot = Slot}) -> Slot end, SlotsMaps1).
+
 -spec reload_slots_map(State::#state{}) -> NewState::#state{}.
 reload_slots_map(State = #state{pool_name = PoolName}) ->
     NewState = case get_cluster_slots(State#state.init_nodes, State, 0) of
         {error, _Reason} ->
-            State#state{init_nodes = []};
+            State;
         [] -> State#state{version = State#state.version + 1};
         ClusterSlots ->
             [close_connection(SlotsMap)

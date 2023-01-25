@@ -164,6 +164,26 @@ basic_test_() ->
                 eredis_cluster:eval(?POOL, Script, ScriptHash, ["qrs"], ["evaltest"]),
                 ?assertEqual({ok, <<"evaltest">>}, eredis_cluster:q(?POOL, ["get", "qrs"]))
             end
+            },
+
+            { "eredis_cluster_monitor:get_state",
+            fun () ->
+                ?assert(is_tuple(eredis_cluster_monitor:get_state(?POOL))),
+                ?assert(is_tuple(eredis_cluster_monitor:get_state(invalid_pool)))
+            end
+            },
+
+            { "eredis_cluster_monitor:get_slot_samples",
+            fun () ->
+                ?assertMatch([_, _, _], eredis_cluster_monitor:get_slot_samples(?POOL))
+            end
+            },
+
+            { "ping_all",
+            fun () ->
+                ?assert(eredis_cluster:ping_all(?POOL)),
+                ?assertNot(eredis_cluster:ping_all(invalid_pool))
+            end
             }
 
       ]
