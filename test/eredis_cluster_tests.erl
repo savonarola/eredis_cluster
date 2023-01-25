@@ -17,9 +17,8 @@
         {"127.0.0.1", 30002}
     ]},
     {pool_size, 5},
-    {pool_max_overflow, 0},
-    {database, 0},
-    {password, "passw0rd"}
+    {password, "passw0rd"},
+    {pool_type, round_robin}
 ]).
 
 setup() ->
