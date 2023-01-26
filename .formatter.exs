@@ -1,0 +1,5 @@
+[
+  inputs: [
+    "mix.exs"
+  ]
+]
