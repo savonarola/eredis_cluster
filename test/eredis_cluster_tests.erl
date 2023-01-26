@@ -104,8 +104,8 @@ basic_test_() ->
                 % In this test the key "load" will be used because the "script
                 % load" command will be executed in the redis server containing
                 % the "load" key. The script should be propagated to other redis
-                % client but for some reason it is not done on Travis test
-                % environment. @TODO : fix travis redis cluster configuration,
+                % client but for some reason it is not done on test
+                % environment. @TODO : fix redis cluster configuration,
                 % or give the possibility to run a command on an arbitrary
                 % redis server (no slot derived from key name)
                 eredis_cluster:q(?POOL, ["del", "load"]),
