@@ -1,6 +1,9 @@
 -module(eredis_cluster_pool_worker).
 -behaviour(gen_server).
--behaviour(poolboy_worker).
+-behaviour(ecpool_worker).
+
+%% ecpool.
+-export([connect/1]).
 
 %% API.
 -export([start_link/1]).
@@ -19,6 +22,9 @@
 -record(state, {conn, host, port, database, password}).
 
 -define(RECONNECT_TIME, 2000).
+
+connect(Args) ->
+    start_link(Args).
 
 is_connected(Pid) ->
     gen_server:call(Pid, is_connected).

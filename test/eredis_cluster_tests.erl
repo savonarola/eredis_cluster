@@ -17,9 +17,8 @@
         {"127.0.0.1", 30002}
     ]},
     {pool_size, 5},
-    {pool_max_overflow, 0},
-    {database, 0},
-    {password, "passw0rd"}
+    {password, "passw0rd"},
+    {pool_type, round_robin}
 ]).
 
 setup() ->
@@ -163,6 +162,26 @@ basic_test_() ->
                 ScriptHash = << << if N >= 10 -> N -10 + $a; true -> N + $0 end >> || <<N:4>> <= crypto:hash(sha, Script) >>,
                 eredis_cluster:eval(?POOL, Script, ScriptHash, ["qrs"], ["evaltest"]),
                 ?assertEqual({ok, <<"evaltest">>}, eredis_cluster:q(?POOL, ["get", "qrs"]))
+            end
+            },
+
+            { "eredis_cluster_monitor:get_state",
+            fun () ->
+                ?assert(is_tuple(eredis_cluster_monitor:get_state(?POOL))),
+                ?assert(is_tuple(eredis_cluster_monitor:get_state(invalid_pool)))
+            end
+            },
+
+            { "eredis_cluster_monitor:get_slot_samples",
+            fun () ->
+                ?assertMatch([_, _, _], eredis_cluster_monitor:get_slot_samples(?POOL))
+            end
+            },
+
+            { "ping_all",
+            fun () ->
+                ?assert(eredis_cluster:ping_all(?POOL)),
+                ?assertNot(eredis_cluster:ping_all(invalid_pool))
             end
             }
 

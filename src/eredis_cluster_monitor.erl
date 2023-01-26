@@ -7,6 +7,7 @@
 -export([get_state/1, get_state_version/1]).
 -export([get_pool_by_slot/2]).
 -export([get_all_pools/1]).
+-export([get_slot_samples/1]).
 
 %% gen_server.
 -export([init/1]).
@@ -28,8 +29,7 @@
     pool_name :: atom(),
     database = 0 :: integer(),
     password = "" :: string(),
-    size     = 10 :: integer(),
-    max_overflow = 0 :: integer()
+    pool_options = [] :: list(tuple())
 }).
 
 %% API.
@@ -49,7 +49,7 @@ refresh_mapping(Name, Version) ->
 %% =============================================================================
 get_state(Name) ->
     case ets:lookup(?MODULE, Name) of
-        undefined -> #state{};
+        [] -> #state{};
         [{Name, State}] -> State
     end.
 
@@ -81,11 +81,19 @@ get_pool_by_slot(Name, Slot) ->
     State = get_state(Name),
     get_pool_by_slot(Slot, State).
 
+get_slot_samples(Name) ->
+    #state{slots_maps = SlotsMaps0} = get_state(Name),
+    SlotsMaps1 = case SlotsMaps0 of
+                     undefined -> [];
+                     T when is_tuple(T) -> tuple_to_list(T)
+                 end,
+    lists:map(fun(#slots_map{start_slot = Slot}) -> Slot end, SlotsMaps1).
+
 -spec reload_slots_map(State::#state{}) -> NewState::#state{}.
 reload_slots_map(State = #state{pool_name = PoolName}) ->
     NewState = case get_cluster_slots(State#state.init_nodes, State, 0) of
         {error, _Reason} ->
-            State#state{init_nodes = []};
+            State;
         [] -> State#state{version = State#state.version + 1};
         ClusterSlots ->
             [close_connection(SlotsMap)
@@ -155,7 +163,6 @@ parse_cluster_slots([], _Index, Acc) ->
     lists:reverse(Acc).
 
 
-
 -spec close_connection(#slots_map{}) -> ok.
 close_connection(SlotsMap) ->
     Node = SlotsMap#slots_map.node,
@@ -172,15 +179,15 @@ close_connection(SlotsMap) ->
             ok
     end.
 
-connect_node(Node = #node{address  = Host, port = Port}, #state{database = DataBase,
-                                                                password = Password,
-                                                                size     = Size,
-                                                                max_overflow = MaxOverflow}) ->
+connect_node(Node = #node{address  = Host, port = Port}, #state{database       = DataBase,
+                                                                password       = Password,
+                                                                pool_options   = PoolOptions
+                                                               }) ->
     Options = case erlang:get(options) of
         undefined -> [];
         Options0 -> Options0
     end,
-    case eredis_cluster_pool:create(Host, Port, DataBase, Password, Size, MaxOverflow, Options) of
+    case eredis_cluster_pool:create(Host, Port, DataBase, Password, PoolOptions, Options) of
         {ok, Pool} ->
             Node#node{pool = Pool};
         _ ->
@@ -219,8 +226,11 @@ connect_(PoolName, Opts) ->
         pool_name = PoolName,
         database = proplists:get_value(database, Opts, 0),
         password = proplists:get_value(password, Opts, ""),
-        size     = proplists:get_value(pool_size, Opts, 10),
-        max_overflow = proplists:get_value(pool_max_overflow, Opts, 0)
+        pool_options = [
+                        {pool_size, proplists:get_value(pool_size, Opts, 10)},
+                        {auto_reconnect, proplists:get_value(auto_reconnect, Opts, false)},
+                        {pool_type, proplists:get_value(pool_type, Opts, random)}
+                       ]
     },
     reload_slots_map(State).
 
