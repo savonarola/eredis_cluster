@@ -34,10 +34,10 @@
 
 %% API.
 start_link(Name, Opts) ->
-    gen_server:start_link({local, name(Name)}, ?MODULE, [Name, Opts], []).
+    gen_server:start_link(?MODULE, [Name, Opts], []).
 
 refresh_mapping(Name, Version) ->
-    case whereis(name(Name)) of
+    case gproc:where({n, l, name(Name)}) of
         undefined -> {error, not_find_process};
         Pid -> gen_server:call(Pid, {reload_slots_map, Version})
     end.
@@ -242,6 +242,7 @@ init([PoolName, Opts]) ->
         #state{init_nodes = []} ->
             {stop, <<"ERR unable to connect to any nodes">>};
         State ->
+            true = gproc:reg({n, l, name(PoolName)}, ignored),
             {ok, State}
     end.
 
@@ -282,4 +283,4 @@ censor_state(State) ->
     State.
 
 name(Name) ->
-    list_to_atom("monitor_" ++ atom_to_list(Name)).
+    {eredis_cluster_monitor, Name}.
